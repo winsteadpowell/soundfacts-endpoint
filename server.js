@@ -174,6 +174,7 @@ app.use((req, res) => {
   });
 });
 
+// Sample commit
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err);
