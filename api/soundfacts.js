@@ -2,16 +2,20 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Paste your FINAL Sound Facts prompt from the Developer Pack here:
 const SOUND_FACTS_PROMPT = `
 PASTE YOUR SOUND FACTS API PROMPT HERE
 `;
 
-export default async function handler(req, res) {
-  // ✅ Add CORS headers
+// ✅ Helper to apply CORS headers consistently
+function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*"); // or restrict to your frontend domain
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
+export default async function handler(req, res) {
+  // Always set CORS headers first
+  setCors(res);
 
   // ✅ Handle preflight requests
   if (req.method === "OPTIONS") {
@@ -25,6 +29,7 @@ export default async function handler(req, res) {
   try {
     const { song, artist } = req.body || {};
     if (!song || !artist) {
+      setCors(res); // ensure headers on error
       return res.status(400).json({
         error: true,
         message: "Missing required fields: song and artist."
@@ -51,6 +56,7 @@ Return ONLY valid JSON in Sound Facts format.`
       const json = JSON.parse(text);
       return res.status(200).json(json);
     } catch {
+      setCors(res);
       return res.status(200).json({
         error: true,
         message: "Model returned invalid JSON.",
@@ -59,6 +65,7 @@ Return ONLY valid JSON in Sound Facts format.`
     }
   } catch (e) {
     console.error(e);
+    setCors(res);
     return res.status(500).json({
       error: true,
       message: "Sound Facts backend error."
