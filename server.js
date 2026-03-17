@@ -29,8 +29,15 @@ export default async function handler(req) {
   }
 
   try {
-    const body = await req.json();
-    const { song, artist } = body || {};
+ console.log("HANDLER START");
+console.log("REQ METHOD:", req.method);
+
+const body = await req.json();
+console.log("REQ BODY:", body);
+
+const { song, artist } = body || {};
+console.log("SONG:", song);
+console.log("ARTIST:", artist);
 
     if (!song || !artist) {
       return new Response(
