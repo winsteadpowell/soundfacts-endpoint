@@ -3,20 +3,22 @@ import OpenAI from "openai";
 export const config = {
   runtime: "edge",
 };
-@@ -17,28 +19,122 @@ export default async function handler(req) {
+
+export default async function handler(req) {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ step: "method-check", error: "Method not allowed" }),
-      {
-        status: 405,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: {
@@ -27,7 +29,6 @@ export const config = {
   }
 
   try {
-    let body;
     const body = await req.json();
     const { song, artist } = body || {};
 
@@ -128,41 +129,23 @@ Rules:
 
     let parsed;
     try {
-      body = await req.json();
-    } catch (e) {
       parsed = JSON.parse(text);
     } catch (parseError) {
       return new Response(
         JSON.stringify({
-          step: "req.json",
-          error: e?.message || "req.json failed",
           error: "AI returned invalid JSON",
           raw: text,
         }),
         {
           status: 500,
-@@ -50,34 +146,24 @@ export default async function handler(req) {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
-    const { song, artist } = body || {};
-
-    return new Response(
-      JSON.stringify({
-        step: "body-parsed",
-        body,
-        song,
-        artist,
-        hasApiKey: !!process.env.OPENAI_API_KEY,
-      }),
-      {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
     return new Response(JSON.stringify(parsed), {
       status: 200,
       headers: {
@@ -173,17 +156,17 @@ Rules:
   } catch (error) {
     return new Response(
       JSON.stringify({
-        step: "outer-catch",
-        error: error?.message || "Internal server error",
         error: error.message || "Internal server error",
       }),
       {
         status: 500,
         headers: {
-          ...corsHeaders,
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
           "Content-Type": "application/json",
         },
       }
+    );
+  }
+}
