@@ -1,20 +1,21 @@
+
 import OpenAI from "openai";
 
+// Allow CORS for browser requests
 export const config = {
   runtime: "edge",
 };
 
 export default async function handler(req) {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-
+  // Handle OPTIONS preflight (this is what was failing)
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
-      headers: corsHeaders,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
     });
   }
 
@@ -22,151 +23,70 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
       },
     });
   }
 
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const body = await req.json();
-    const { song, artist } = body || {};
 
-    if (!song || !artist) {
-      return new Response(
-        JSON.stringify({ error: "Song and artist are required" }),
-        {
-          status: 400,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Missing OPENAI_API_KEY" }),
-        {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
-
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    const { song, artist } = body;
 
     const prompt = `
-You are a professional music analyst for a project called Sound Facts.
-
-Analyze the song "${song}" by "${artist}".
-
-Return only valid JSON in this exact structure:
+You are a professional music analyst. Return ONLY valid JSON with this structure:
 
 {
-  "song": "string",
-  "artist": "string",
-  "year": "string",
-  "genre": "string",
-  "runtime": "string",
-  "summary": "string",
+  "song": "",
+  "artist": "",
+  "year": "",
+  "genre": "",
+  "runtime": "",
+  "summary": "",
   "core_categories": {
-    "emotional_honesty": {
-      "score": 1,
-      "comment": "string"
-    },
-    "storytelling": {
-      "score": 1,
-      "comment": "string"
-    },
-    "melodic_complexity": {
-      "score": 1,
-      "comment": "string"
-    },
-    "lyrical_depth": {
-      "score": 1,
-      "comment": "string"
-    },
-    "vocal_delivery": {
-      "score": 1,
-      "comment": "string"
-    },
-    "production_quality": {
-      "score": 1,
-      "comment": "string"
-    },
-    "originality": {
-      "score": 1,
-      "comment": "string"
-    },
-    "replay_value": {
-      "score": 1,
-      "comment": "string"
-    }
-  },
-  "overall_score": 1
+      "emotional_honesty": { "score": 1-10, "comment": "" },
+      "storytelling": { "score": 1-10, "comment": "" },
+      "melodic_complexity": { "score": 1-10, "comment": "" },
+      "vocal_performance": { "score": 1-10, "comment": "" },
+      "production_quality": { "score": 1-10, "comment": "" },
+      "cultural_imprint": { "score": 1-10, "comment": "" },
+      "replay_value": { "score": 1-10, "comment": "" },
+      "overall_impression": { "score": 1-10, "comment": "" }
+  }
 }
 
-Rules:
-- Return JSON only
-- No markdown
-- No explanation outside the JSON
-- Scores must be integers from 1 to 10
+Song: ${song}
+Artist: ${artist}
 `;
 
-    const response = await openai.responses.create({
-      model: "gpt-4.1-mini",
+    const completion = await openai.responses.create({
+      model: "gpt-4o-mini",
       input: prompt,
     });
 
-    const text = response.output_text;
+    let text = completion.output_text;
 
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (parseError) {
-      return new Response(
-        JSON.stringify({
-          error: "AI returned invalid JSON",
-          raw: text,
-        }),
-        {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+    // Ensure pure JSON
+    text = text.trim();
+    if (text.startsWith("```")) {
+      text = text.replace(/```json/g, "").replace(/```/g, "");
     }
 
-    return new Response(JSON.stringify(parsed), {
+    return new Response(text, {
       status: 200,
       headers: {
-        ...corsHeaders,
+        "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
       },
     });
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: error.message || "Internal server error",
-      }),
-      {
-        status: 500,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Content-Type": "application/json",
-        },
-      }
-    );
+
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   }
 }
